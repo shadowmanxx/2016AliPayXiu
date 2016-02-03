@@ -1,5 +1,6 @@
 package com.codeboy.qianghongbao.job;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -115,7 +116,9 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
     }
 
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
-    private void openHongBao(AccessibilityEvent event) {    	
+    private void openHongBao(AccessibilityEvent event) {
+    	Log.w(TAG, "EventClass:  "+event.getClassName());
+    	
         if("com.alipay.android.wallet.newyear.activity.MonkeyYearActivity".equals(event.getClassName())) {
             //点中了红包，下一步就是去拆红包
             handleLuckyMoneyReceive();
@@ -131,7 +134,7 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
     /**
      * 点击聊天里的红包后，显示的界面
      * */
-    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
+    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)    
     private void handleLuckyMoneyReceive() {
         AccessibilityNodeInfo nodeInfo = getService().getRootInActiveWindow();
         if(nodeInfo == null) {
@@ -142,57 +145,45 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
         AccessibilityNodeInfo targetNode = null;
 
         List<AccessibilityNodeInfo> list = null;
-        int event = getConfig().getWechatAfterOpenHongBaoEvent();
-        Log.w(TAG, "eventTrigger:"+nodeInfo);
-        if(event == Config.WX_AFTER_OPEN_HONGBAO) { //拆红包
-            if (getWechatVersion() < USE_ID_MIN_VERSION) {
-                list = nodeInfo.findAccessibilityNodeInfosByText("拆红包");
-            } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    list = nodeInfo.findAccessibilityNodeInfosByText("com.tencent.mm:id/b2c");
-                }
-                if(list == null || list.isEmpty()) {
-                    List<AccessibilityNodeInfo> l = nodeInfo.findAccessibilityNodeInfosByText("给你发了一个红包");
-                    if(l != null && !l.isEmpty()) {
-                        AccessibilityNodeInfo p = l.get(0).getParent();
-                        if(p != null) {
-                            for (int i = 0; i < p.getChildCount(); i++) {
-                                AccessibilityNodeInfo node = p.getChild(i);
-                                if("android.widget.Button".equals(node.getClassName())) {
-                                    targetNode = node;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } else if(event == Config.WX_AFTER_OPEN_SEE) { //看一看
-            if(getWechatVersion() < USE_ID_MIN_VERSION) { //低版本才有 看大家手气的功能
-                list = nodeInfo.findAccessibilityNodeInfosByText("看看大家的手气");
-            }
-        }
+        int event = getConfig().getWechatAfterOpenHongBaoEvent();       
+        recycle(nodeInfo);
 
-        if(list != null && !list.isEmpty()) {
-            targetNode = list.get(0);
-        }
+       
 
-        if(targetNode != null) {
-            final AccessibilityNodeInfo n = targetNode;
-            long sDelayTime = getConfig().getWechatOpenDelayTime();
-            if(sDelayTime != 0) {
-                getHandler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                    }
-                }, sDelayTime);
-            } else {
-                n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-            }
-        }
+       
     }
-
+    
+    @SuppressLint("NewApi")
+	public void recycle(AccessibilityNodeInfo info) {  
+    	Log.w(TAG, "TotalChild: "+info.getChildCount());
+        if (info.getChildCount() == 0) {   
+            if(info.getText() != null){  
+                if("领取红包".equals(info.getText().toString())){  
+                    //这里有一个问题需要注意，就是需要找到一个可以点击的View  
+                    Log.i("demo", "Click"+",isClick:"+info.isClickable());  
+                    info.performAction(AccessibilityNodeInfo.ACTION_CLICK);  
+                    AccessibilityNodeInfo parent = info.getParent();  
+                    while(parent != null){  
+                        Log.i("demo", "parent isClick:"+parent.isClickable());  
+                        if(parent.isClickable()){  
+                            parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);  
+                            break;  
+                        }  
+                        parent = parent.getParent();  
+                    }  
+                      
+                }  
+            }  
+              
+        } else {    
+            for (int i = 0; i < info.getChildCount(); i++) {    
+                if(info.getChild(i)!=null){ 
+                	 Log.w(TAG, "Childinfo_"+i+": "+info.describeContents());
+                    recycle(info.getChild(i));    
+                }    
+            }    
+        }    
+    }            
     /**
      * 收到聊天里的红包
      * */
